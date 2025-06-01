@@ -1,4 +1,21 @@
-<!DOCTYPE html>
+
+<div id="adminControls">
+  <button onclick="setResult('big')">SET BIG</button>
+  <button onclick="setResult('small')">SET SMALL</button>
+  <input type="text" id="adjustUser" placeholder="Username">
+  <input type="number" id="adjustAmount" placeholder="Amount">
+  <button onclick="adjustBalance()">Adjust Balance</button>
+</div>
+
+<script>
+  function adjustBalance() {
+    socket.emit('adminAction', {
+      action: 'adjustBalance',
+      targetUser: document.getElementById('adjustUser').value,
+      amount: parseInt(document.getElementById('adjustAmount').value)
+    });
+  }
+</script><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
