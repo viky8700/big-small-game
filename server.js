@@ -1,105 +1,79 @@
 const express = require('express');
 const socketio = require('socket.io');
 const path = require('path');
-const bcrypt = require('bcryptjs');
 
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-// Player database
-const players = {};
-const gameHistory = [];
-let currentRound = 1;
+// Game state
+let gameState = {
+  phase: 'betting',
+  currentResult: null,
+  round: 7,
+  timer: 60,
+  bets: {
+    big: { total: 2450, players: 12 },
+    small: { total: 1780, players: 8 }
+  },
+  activePlayers: 20,
+  history: [
+    { round: 6, result: 'BIG', change: '+200' },
+    { round: 5, result: 'SMALL', change: '-100' },
+    { round: 4, result: 'BIG', change: '+350' }
+  ]
+};
 
 app.use(express.static('public'));
-app.use(express.json());
 
 // Routes
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
-app.get('/game', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 app.get('/admin', (req, res) => res.sendFile(path.join(__dirname, 'public', 'admin.html')));
-
-// Player login API
-app.post('/login', async (req, res) => {
-  const { username, password } = req.body;
-  
-  if (!players[username]) {
-    // New player
-    const hashedPassword = await bcrypt.hash(password, 10);
-    players[username] = {
-      password: hashedPassword,
-      balance: 2000,
-      bets: []
-    };
-    return res.json({ success: true, newUser: true });
-  } else {
-    // Existing player
-    const match = await bcrypt.compare(password, players[username].password);
-    if (match) {
-      return res.json({ success: true, balance: players[username].balance });
-    }
-  }
-  res.json({ success: false });
-});
 
 const server = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 const io = socketio(server);
 
-// Game state
-let gameState = {
-  phase: 'betting', // betting|results
-  timer: 60,
-  currentResult: null
-};
-
-// Socket.io logic
 io.on('connection', (socket) => {
+  // Send current game state
+  socket.emit('gameUpdate', gameState);
+  
+  // Handle player bets
   socket.on('placeBet', (data) => {
-    const player = players[data.username];
-    if (player && player.balance >= data.amount) {
-      player.balance -= data.amount;
-      player.bets.push({
-        amount: data.amount,
-        choice: data.choice,
-        round: currentRound
-      });
-      io.emit('balanceUpdate', { 
-        username: data.username, 
-        balance: player.balance 
-      });
-    }
+    gameState.bets[data.choice].total += data.amount;
+    gameState.bets[data.choice].players++;
+    gameState.activePlayers++;
+    
+    // Add to admin log
+    const logEntry = {
+      player: `Player${Math.floor(Math.random() * 100)}`,
+      amount: data.amount,
+      choice: data.choice,
+      time: `${Math.floor(Math.random() * 60)}s ago`
+    };
+    
+    io.emit('betPlaced', logEntry);
   });
-
+  
+  // Admin controls
   socket.on('setResult', (result) => {
     gameState.currentResult = result;
     gameState.phase = 'results';
-    gameHistory.push(result);
+    gameState.history.unshift({
+      round: gameState.round,
+      result: result,
+      change: result === 'BIG' ? '+200' : '-100'
+    });
     
-    // Calculate winnings
-    Object.keys(players).forEach(username => {
-      const player = players[username];
-      player.bets.forEach(bet => {
-        if (bet.round === currentRound && bet.choice === result.toLowerCase()) {
-          player.balance += bet.amount * 2; // 1:1 payout
-        }
-      });
-    });
-
-    io.emit('resultSet', { 
-      result,
-      history: gameHistory 
-    });
-
-    // Start new round after 1 minute
+    io.emit('resultSet', result);
+    
+    // Start new round after 5 seconds
     setTimeout(() => {
-      currentRound++;
       gameState.phase = 'betting';
+      gameState.round++;
       gameState.timer = 60;
-      io.emit('newRound', { 
-        round: currentRound,
-        timer: 60 
-      });
-    }, 60000);
+      gameState.bets = { big: { total: 0, players: 0 }, small: { total: 0, players: 0 }};
+      gameState.activePlayers = 0;
+      io.emit('newRound', gameState);
+    }, 5000);
   });
 });
 
@@ -108,5 +82,9 @@ setInterval(() => {
   if (gameState.phase === 'betting') {
     gameState.timer--;
     io.emit('timerUpdate', gameState.timer);
+    
+    if (gameState.timer <= 0) {
+      gameState.timer = 60;
+    }
   }
 }, 1000);
