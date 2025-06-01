@@ -1,4 +1,9 @@
-const express = require('express');
+{
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express-session": "^1.17.3"
+  }
+}const express = require('express');
 const socketio = require('socket.io');
 const path = require('path');
 
