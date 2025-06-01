@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Control Panel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-dice"></i> BIG OR SMALL <i class="fas fa-dice"></i></h1>
+            <p>Admin Controlled Game with Real-time Monitoring</p>
+            
+            <div class="game-info betting-phase">
+                <div>
+                    <h3><i class="fas fa-clock"></i> CURRENT PHASE</h3>
+                    <p id="phaseText">Betting Open - Place your bets!</p>
+                </div>
+                <div class="timer" id="timer">01:00</div>
+                <div>
+                    <h3><i class="fas fa-history"></i> CURRENT ROUND</h3>
+                    <p>Round #<span id="roundNumber">7</span></p>
+                </div>
+            </div>
+        </header>
+        
+        <div class="game-container">
+            <div class="admin-section">
+                <h2 class="section-title"><i class="fas fa-crown"></i> ADMIN DASHBOARD</h2>
+                
+                <div class="bet-stats">
+                    <div class="stat-box big-stat">
+                        <div class="stat-title">TOTAL BIG BETS</div>
+                        <div class="stat-value big-value"><span id="bigTotal">2,450</span> <i class="fas fa-coins"></i></div>
+                        <div><span id="bigPlayers">12</span> players</div>
+                    </div>
+                    <div class="stat-box small-stat">
+                        <div class="stat-title">TOTAL SMALL BETS</div>
+                        <div class="stat-value small-value"><span id="smallTotal">1,780</span> <i class="fas fa-coins"></i></div>
+                        <div><span id="smallPlayers">8</span> players</div>
+                    </div>
+                </div>
+                
+                <div class="admin-controls">
+                    <button class="admin-btn set-big" id="setBig">
+                        <i class="fas fa-arrow-up"></i>
+                        SET BIG
+                    </button>
+                    <button class="admin-btn set-small" id="setSmall">
+                        <i class="fas fa-arrow-down"></i>
+                        SET SMALL
+                    </button>
+                    <button class="admin-btn random-btn" id="setRandom">
+                        <i class="fas fa-dice"></i>
+                        SET RANDOM RESULT
+                    </button>
+                </div>
+                
+                <div class="history">
+                    <h3 class="history-title"><i class="fas fa-list"></i> LIVE BET FEED</h3>
+                    <div class="history-list" id="adminLog">
+                        <div class="history-item history-big">
+                            <span>Player7 bet 200 on BIG</span>
+                            <span>15s ago</span>
+                        </div>
+                        <div class="history-item history-small">
+                            <span>Player3 bet 150 on SMALL</span>
+                            <span>22s ago</span>
+                        </div>
+                        <div class="history-item history-big">
+                            <span>Player11 bet 500 on BIG</span>
+                            <span>35s ago</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="player-count">
+                    <i class="fas fa-users"></i>
+                    <span><span id="activePlayers">20</span> PLAYERS ACTIVE</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        
+        // DOM elements
+        const elements = {
+            roundNumber: document.getElementById('roundNumber'),
+            timer: document.getElementById('timer'),
+            phaseText: document.getElementById('phaseText'),
+            bigTotal: document.getElementById('bigTotal'),
+            bigPlayers: document.getElementById('bigPlayers'),
+            smallTotal: document.getElementById('smallTotal'),
+            smallPlayers: document.getElementById('smallPlayers'),
+            activePlayers: document.getElementById('activePlayers'),
+            adminLog: document.getElementById('adminLog'),
+            setBig: document.getElementById('setBig'),
+            setSmall: document.getElementById('setSmall'),
+            setRandom: document.getElementById('setRandom')
+        };
+        
+        // Initialize game
+        socket.on('gameUpdate', (state) => {
+            elements.roundNumber.textContent = state.round;
+            elements.timer.textContent = state.timer.toString().padStart(2, '0');
+            elements.bigTotal.textContent = state.bets.big.total.toLocaleString();
+            elements.bigPlayers.textContent = state.bets.big.players;
+            elements.smallTotal.textContent = state.bets.small.total.toLocaleString();
+            elements.smallPlayers.textContent = state.bets.small.players;
+            elements.activePlayers.textContent = state.activePlayers;
+            
+            if (state.phase === 'results') {
+                elements.phaseText.textContent = 'Results Phase';
+                document.querySelector('.game-info').className = 'game-info results-phase';
+            } else {
+                elements.phaseText.textContent = 'Betting Open - Place your bets!';
+                document.querySelector('.game-info').className = 'game-info betting-phase';
+            }
+        });
+        
+        // New bets
+        socket.on('betPlaced', (bet) => {
+            const logEntry = document.createElement('div');
+            logEntry.className = `history-item history-${bet.choice}`;
+            logEntry.innerHTML = `
+                <span>${bet.player} bet ${bet.amount} on ${bet.choice.toUpperCase()}</span>
+                <span>${bet.time}</span>
+            `;
+            elements.adminLog.prepend(logEntry);
+        });
+        
+        // Admin controls
+        elements.setBig.addEventListener('click', () => socket.emit('setResult', 'BIG'));
+        elements.setSmall.addEventListener('click', () => socket.emit('setResult', 'SMALL'));
+        elements.setRandom.addEventListener('click', () => {
+            const result = Math.random() > 0.5 ? 'BIG' : 'SMALL';
+            socket.emit('setResult', result);
+        });
+    </script>
+</body>
+</html>
