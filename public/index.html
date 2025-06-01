@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Big or Small Game</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-dice"></i> BIG OR SMALL <i class="fas fa-dice"></i></h1>
+            <p>Admin Controlled Game with Real-time Monitoring</p>
+            
+            <div class="game-info betting-phase">
+                <div>
+                    <h3><i class="fas fa-clock"></i> CURRENT PHASE</h3>
+                    <p>Betting Open - Place your bets!</p>
+                </div>
+                <div class="timer">01:00</div>
+                <div>
+                    <h3><i class="fas fa-history"></i> CURRENT ROUND</h3>
+                    <p>Round #<span id="roundNumber">7</span></p>
+                </div>
+            </div>
+        </header>
+        
+        <div class="game-container">
+            <div class="player-section">
+                <h2 class="section-title"><i class="fas fa-user"></i> PLAYER AREA</h2>
+                
+                <div class="player-info">
+                    <div>
+                        <h3>BALANCE</h3>
+                        <div class="balance-display"><span class="coins">5,430</span> coins</div>
+                    </div>
+                    <div>
+                        <h3>LAST BET</h3>
+                        <div class="balance-display"><span class="coins">500</span> coins on BIG</div>
+                    </div>
+                </div>
+                
+                <div class="bet-input-container">
+                    <i class="fas fa-coins bet-input-icon"></i>
+                    <input type="number" class="bet-input" id="betAmount" placeholder="Enter bet amount" min="10" value="100">
+                </div>
+                
+                <div class="bet-controls">
+                    <button class="bet-btn big-btn" id="betBig">
+                        <i class="fas fa-arrow-up"></i>
+                        BET BIG
+                    </button>
+                    <button class="bet-btn small-btn" id="betSmall">
+                        <i class="fas fa-arrow-down"></i>
+                        BET SMALL
+                    </button>
+                </div>
+                
+                <div class="result-display" id="resultDisplay">
+                    <div class="result-label">CURRENT RESULT</div>
+                    <span id="currentResult">BIG</span>
+                </div>
+                
+                <div class="history">
+                    <h3 class="history-title"><i class="fas fa-history"></i> YOUR BET HISTORY</h3>
+                    <div class="history-list" id="historyList">
+                        <div class="history-item history-big">
+                            <span>Round #6: BIG</span>
+                            <span>+200 coins</span>
+                        </div>
+                        <div class="history-item history-small">
+                            <span>Round #5: SMALL</span>
+                            <span>-100 coins</span>
+                        </div>
+                        <div class="history-item history-big">
+                            <span>Round #4: BIG</span>
+                            <span>+350 coins</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let playerBalance = 5430;
+        
+        // DOM elements
+        const elements = {
+            roundNumber: document.getElementById('roundNumber'),
+            timer: document.querySelector('.timer'),
+            betAmount: document.getElementById('betAmount'),
+            betBig: document.getElementById('betBig'),
+            betSmall: document.getElementById('betSmall'),
+            currentResult: document.getElementById('currentResult'),
+            historyList: document.getElementById('historyList'),
+            balanceDisplay: document.querySelector('.balance-display .coins')
+        };
+        
+        // Initialize game
+        socket.on('gameUpdate', (state) => {
+            elements.roundNumber.textContent = state.round;
+            elements.timer.textContent = state.timer.toString().padStart(2, '0');
+            elements.currentResult.textContent = state.currentResult || 'BIG';
+        });
+        
+        // Place bets
+        elements.betBig.addEventListener('click', () => placeBet('big'));
+        elements.betSmall.addEventListener('click', () => placeBet('small'));
+        
+        function placeBet(choice) {
+            const amount = parseInt(elements.betAmount.value);
+            if (isNaN(amount) || amount < 10) {
+                alert('Minimum bet is 10 coins!');
+                return;
+            }
+            
+            if (amount > playerBalance) {
+                alert('Not enough coins!');
+                return;
+            }
+            
+            playerBalance -= amount;
+            elements.balanceDisplay.textContent = playerBalance.toLocaleString();
+            
+            socket.emit('placeBet', {
+                choice: choice,
+                amount: amount
+            });
+            
+            alert(`Bet ${amount} coins on ${choice.toUpperCase()}`);
+        }
+        
+        // Handle results
+        socket.on('resultSet', (result) => {
+            elements.currentResult.textContent = result;
+            document.querySelector('.game-info').className = 
+                result === 'BIG' ? 'game-info results-phase' : 'game-info betting-phase';
+        });
+    </script>
+</body>
+</html>
