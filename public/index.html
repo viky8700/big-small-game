@@ -1,3 +1,13 @@
+
+<div id="balanceDisplay">Balance: ₹2000</div>
+
+<script>
+
+  fetch('/balance').then(res => res.json()).then(data => {
+    document.getElementById('balanceDisplay').textContent = `Balance: ₹${data.balance}`;
+  });
+      </script>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
