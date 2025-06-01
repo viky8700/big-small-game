@@ -1,4 +1,47 @@
-{
+
+const session = require('express-session');
+const bcrypt = require('bcryptjs');
+app.use(session({
+  secret: 'your_secret_key',
+  resave: false,
+  saveUninitialized: true
+}));
+
+// Player database
+const players = {
+  // Example admin (you)
+  'admin': { 
+    password: bcrypt.hashSync('your_admin_password', 10),
+    balance: 999999,
+    isAdmin: true 
+  }
+};
+
+// Add these routes BEFORE socket.io initialization:
+app.post('/login', async (req, res) => {
+  const { username, password } = req.body;
+  
+  if (!players[username]) {
+    players[username] = {
+      password: await bcrypt.hash(password, 10),
+      balance: 2000,
+      isAdmin: false
+    };
+  }
+  
+  if (await bcrypt.compare(password, players[username].password)) {
+    req.session.user = players[username];
+    req.session.username = username;
+    return res.json({ success: true });
+  }
+  res.json({ success: false });
+});
+
+app.get('/balance', (req, res) => {
+  if (req.session.user) {
+    res.json({ balance: req.session.user.balance });
+  }
+});{
   "name": "big-small-game",
   "version": "1.0.0",
   "scripts": {
